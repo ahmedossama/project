@@ -1,4 +1,3 @@
-
 public class Cache {
 	private int size; //
 	private int lineSize;
@@ -7,7 +6,8 @@ public class Cache {
 	private int lines;
 	private String type;
 	private int numCycles;
-	
+	private CacheEntry[] cacheEntries;
+
 	public Cache(int s, int l, int m, int numCycles, String writePolicy) {
 		setSize(s);
 		setLineSize(l);
@@ -15,16 +15,15 @@ public class Cache {
 		this.setWritePolicy(writePolicy);
 		setLines(getSize() / getLineSize());
 		this.setNumCycles(numCycles);
-		if (getAssociativity() == getLines()){
+		if (getAssociativity() == getLines()) {
 			setType("fully associative");
-		}
-		else if(getAssociativity() == 1) {
+		} else if (getAssociativity() == 1) {
 			setType("direct mapped");
-		}
-		else {
+		} else {
 			setType("set associative");
 		}
-		
+		this.setCacheEntries(new CacheEntry[getLines()]);
+
 	}
 
 	public String getWritePolicy() {
@@ -81,5 +80,13 @@ public class Cache {
 
 	public void setNumCycles(int numCycles) {
 		this.numCycles = numCycles;
+	}
+
+	public void setCacheEntries(CacheEntry[] cacheEntries) {
+		this.cacheEntries = cacheEntries;
+	}
+
+	public CacheEntry[] getCacheEntries() {
+		return cacheEntries;
 	}
 }
