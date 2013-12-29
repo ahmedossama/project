@@ -1,15 +1,15 @@
 
 public class Register {
-	private short value;
+	private int value;
 
 	public Register() {
-		this.value = (short) 0;
+		this.value =  0;
 	}
-	public short getValue() {
+	public int getValue() {
 		return value;
 	}
 
-	public void setValue(short value) {
+	public void setValue(int value) {
 		this.value = value;
 	}
 	

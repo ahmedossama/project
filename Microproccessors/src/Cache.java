@@ -2,17 +2,20 @@ public class Cache {
 	private int size; //
 	private int lineSize;
 	private int associativity;
-	private String writePolicy;
+	private String writePolicyHit;
+	private String writePolicyMiss;
 	private int lines;
 	private String type;
 	private int numCycles;
 	private CacheEntry[] cacheEntries;
 
-	public Cache(int s, int l, int m, int numCycles, String writePolicy) {
+	public Cache(int s, int l, int m, int numCycles, String writePolicyHit,
+			String writePolicyMiss) {
 		setSize(s);
 		setLineSize(l);
 		setAssociativity(m);
-		this.setWritePolicy(writePolicy);
+		this.setWritePolicyHit(writePolicyHit);
+		this.setWritePolicyMiss(writePolicyMiss);
 		setLines(getSize() / getLineSize());
 		this.setNumCycles(numCycles);
 		if (getAssociativity() == getLines()) {
@@ -26,12 +29,20 @@ public class Cache {
 
 	}
 
-	public String getWritePolicy() {
-		return writePolicy;
+	public String getWritePolicyHit() {
+		return writePolicyHit;
 	}
 
-	public void setWritePolicy(String writePolicy) {
-		this.writePolicy = writePolicy;
+	public String getWritePolicyMiss() {
+		return writePolicyMiss;
+	}
+
+	public void setWritePolicyHit(String writePolicyHit) {
+		this.writePolicyHit = writePolicyHit;
+	}
+
+	public void setWritePolicyMiss(String writePolicyMiss) {
+		this.writePolicyMiss = writePolicyMiss;
 	}
 
 	public int getAssociativity() {
