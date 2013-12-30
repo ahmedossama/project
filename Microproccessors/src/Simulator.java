@@ -7,9 +7,9 @@ import java.util.Map;
 
 public class Simulator {
 	int memory_access_time;
-	ArrayList<Cache> caches = new ArrayList<Cache>(3);
+	Cache[] caches;
 	int instuctionBufferSize;
-	Map<String, reservationStation> reservationStations = new HashMap<String, reservationStation>();
+	reservationStation[] reservationStations;
 	ROB[] reOrderBuffers;
 	Register R0;
 	Register R1;
@@ -19,26 +19,25 @@ public class Simulator {
 	Register R5;
 	Register R6;
 	Register R7;
+	Register PC;
 	int cachelvls;
 	int startAddress;
 	int currentAddress;
-	Register[] registerFile = new Register[8];
+	int instructionsInBuffer = 0;
+	int instructionBufferIndex = 0;
+	boolean fetchHazard = false;
+	Register[] registerFile = new Register[9];
 	Memory mem = new Memory();
 	int numOfInstructions;
 	Instruction[] instructionBuffer;
 	String[] cacheInstruction;
+	FunctionalUnit[] functionalUnits;
 	ArrayList<Instruction> instructions_array = new ArrayList<Instruction>();
-
-	public Simulator() {
-		for (int i = 0; i < 3; i++) {
-			caches.add(null);
-		}
-	}
 
 	public static void main(String[] args) throws Exception {
 		Simulator simulator = new Simulator();
 		BufferedReader br = new BufferedReader(new FileReader(
-				"C:\\Users\\HGezeery\\project\\Microproccessors\\file.txt"));
+				"C:\\Users\\Omar\\project\\Microproccessors\\file.txt"));
 		String everything;
 		try {
 			StringBuilder sb = new StringBuilder();
@@ -57,6 +56,7 @@ public class Simulator {
 
 		// caches initialization
 		int cache_lvls = Integer.parseInt(instructions[0]);
+		simulator.caches = new Cache[cache_lvls];
 		int current_line = 2;
 		String cache_1_geometry = instructions[1];
 		if (cache_lvls == 2) {
@@ -75,7 +75,7 @@ public class Simulator {
 					Integer.parseInt(cache_3_geometry1[2]),
 					Integer.parseInt(cache_3_geometry1[3]),
 					cache_3_geometry1[4], cache_3_geometry1[5]);
-			simulator.caches.add(2, lvl3);
+			simulator.caches[2] = lvl3;
 		case 2:
 
 			String[] cache_2_geometry1 = instructions[2].split(",");
@@ -85,7 +85,7 @@ public class Simulator {
 					Integer.parseInt(cache_2_geometry1[2]),
 					Integer.parseInt(cache_2_geometry1[3]),
 					cache_2_geometry1[4], cache_2_geometry1[5]);
-			simulator.caches.add(1, lvl2);
+			simulator.caches[1] = lvl2;
 		case 1:
 			String[] cache_1_geometry1 = cache_1_geometry.split(",");
 
@@ -94,9 +94,8 @@ public class Simulator {
 					Integer.parseInt(cache_1_geometry1[2]),
 					Integer.parseInt(cache_1_geometry1[3]),
 					cache_1_geometry1[4], cache_1_geometry1[5]);
-			simulator.caches.add(0, lvl1);
+			simulator.caches[0] = lvl1;
 		}
-		simulator.cachelvls = simulator.caches.size() - 3;
 		// memory access time
 		simulator.memory_access_time = Integer
 				.parseInt(instructions[current_line]);
@@ -114,18 +113,38 @@ public class Simulator {
 		int num_add = Integer.parseInt(reservations[0]);
 		int num_mul = Integer.parseInt(reservations[1]);
 		int num_load = Integer.parseInt(reservations[2]);
-		for (int i = 1; i <= num_add; i++) {
-			simulator.reservationStations.put("add" + i,
-					new reservationStation("add" + i));
+		simulator.reservationStations = new reservationStation[num_add
+				+ num_mul + num_load];
+		int x;
+		for (int i = 0; i < num_add + num_mul + num_load; i++) {
+			if (i < num_add) {
+				simulator.reservationStations[i] = new reservationStation("add");
+			} else {
+				if (i < num_mul + num_add) {
+					x = i - num_add;
+					simulator.reservationStations[i] = new reservationStation(
+							"mul");
+				} else {
+					if (i < num_load + num_add + num_mul) {
+						x = i - num_add - num_mul;
+						simulator.reservationStations[i] = new reservationStation(
+								"load");
+					}
+				}
+			}
+
 		}
-		for (int i = 1; i <= num_mul; i++) {
-			simulator.reservationStations.put("mul" + i,
-					new reservationStation("mul" + i));
+
+		// Functional Unit initialization
+		simulator.functionalUnits = new FunctionalUnit[num_add + num_mul
+				+ num_load];
+		String functionalUnitName = "";
+		for (int i = 0; i < num_add + num_mul + num_load; i++) {
+			functionalUnitName = simulator.reservationStations[i].name;
+			simulator.functionalUnits[i] = new FunctionalUnit(
+					functionalUnitName);
 		}
-		for (int i = 1; i <= num_load; i++) {
-			simulator.reservationStations.put("load" + i,
-					new reservationStation("load" + i));
-		}
+
 		// registers initialization
 		simulator.R0 = new Register();
 		simulator.R1 = new Register();
@@ -135,6 +154,7 @@ public class Simulator {
 		simulator.R5 = new Register();
 		simulator.R6 = new Register();
 		simulator.R7 = new Register();
+		simulator.PC = new Register();
 		simulator.registerFile[0] = simulator.R0;
 		simulator.registerFile[1] = simulator.R1;
 		simulator.registerFile[2] = simulator.R2;
@@ -143,6 +163,7 @@ public class Simulator {
 		simulator.registerFile[5] = simulator.R5;
 		simulator.registerFile[6] = simulator.R6;
 		simulator.registerFile[7] = simulator.R7;
+		simulator.registerFile[8] = simulator.PC;
 
 		// ROB initialization
 		int num_ROB = Integer.parseInt(instructions[current_line]);
@@ -172,6 +193,7 @@ public class Simulator {
 			current_line++;
 		}
 		current_line++;
+		// getting the instructions from the text file
 		for (int i = current_line; i < instructions.length; i++) {
 			simulator.mem.memory[simulator.currentAddress] = instructions[current_line];
 			simulator.instructions_array.add(decode(simulator,
@@ -189,13 +211,17 @@ public class Simulator {
 			simulator.cacheInstruction[i] = simulator.mem.memory[simulator.currentAddress];
 			simulator.currentAddress++;
 		}
+
 		simulator.instructionBuffer = new Instruction[simulator.instuctionBufferSize];
+		simulator.currentAddress = simulator.startAddress;
+		simulate(simulator);
 	}
 
 	public static Instruction decode(Simulator s, String instruction) {
 		String[] instruction_split = instruction.split(",");
 		String operation = instruction_split[0];
 		Instruction current = new Instruction();
+		current.status = "";
 		if (operation.equals("add") || operation.equals("sub")
 				|| operation.equals("addi")) {
 			current.type = "add";
@@ -330,4 +356,42 @@ public class Simulator {
 
 	}
 
+	public static void simulate(Simulator s) {
+		s.PC.setValue(s.currentAddress);
+		while (true) {
+			s.fetchHazard = false;
+			s.instructionBuffer[s.instructionBufferIndex] = decode(s,
+					s.mem.memory[s.PC.getValue()]);
+			s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
+			s.instructionBufferIndex++;
+			s.instructionsInBuffer++;
+			if (s.instructionBuffer[0] == null) {
+				for (int i = 1; i <= s.instructionsInBuffer; i++) {
+					s.instructionBuffer[i - 1] = s.instructionBuffer[i];
+				}
+			}
+			if (!s.instructionBuffer[0].operation.equals("sw")) {
+				for (int i = 0; i < s.functionalUnits.length; i++) {
+					if ((!s.functionalUnits[i].busy)
+							&& (s.instructionBuffer[0].Ra
+									.equals(s.functionalUnits[i].register))) {
+						s.fetchHazard = true;
+					}
+				}
+				if (!s.fetchHazard) {
+					for (int i = 0; i < s.reservationStations.length; i++) {
+						if ((s.reservationStations[i].name
+								.equals(s.instructionBuffer[0].type))
+								&& (!s.reservationStations[i].busy)) {
+							s.reservationStations[i].busy=true;
+							s.reservationStations[i].operation=s.instructionBuffer[0].operation;
+							s.reservationStations[i].rDestination=s.instructionBuffer[0].Ra;
+							s.functionalUnits[i].busy = false;
+						}
+					}
+				}
+			}
+		}
+
+	}
 }

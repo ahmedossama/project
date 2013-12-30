@@ -1,7 +1,7 @@
 public class reservationStation {
 	String name;
 	boolean busy;
-	String op;
+	String operation;
 	Register rj;
 	Register rk;
 	String qj;
@@ -9,7 +9,7 @@ public class reservationStation {
 	int offset;
 	int destination;
 	int remaining_cycles;
-
+	Register rDestination;
 	public reservationStation(String name) {
 		this.name = name;
 	}

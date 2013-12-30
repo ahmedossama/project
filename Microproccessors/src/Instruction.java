@@ -7,5 +7,7 @@ public class Instruction {
 	Register Rc;
 	boolean immediate = false;
 	int imm;
+	String status;
+	
 
 }
