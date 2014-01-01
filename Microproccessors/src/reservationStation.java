@@ -1,16 +1,15 @@
 public class reservationStation {
-	String name;
+	String type;
 	boolean busy;
 	String operation;
-	Register rj;
-	Register rk;
+	int rj;
+	int rk;
 	String qj;
 	String qk;
 	int offset;
 	int destination;
 	int remaining_cycles;
-	Register rDestination;
-	public reservationStation(String name) {
-		this.name = name;
+	public reservationStation(String type) {
+		this.type = type;
 	}
 }

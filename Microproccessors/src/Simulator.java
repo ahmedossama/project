@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Simulator {
+	int cycles = 0;
 	int memory_access_time;
 	Cache[] caches;
 	int instuctionBufferSize;
@@ -25,6 +26,8 @@ public class Simulator {
 	int currentAddress;
 	int instructionsInBuffer = 0;
 	int instructionBufferIndex = 0;
+	int ROB_head;
+	int ROB_tail;
 	boolean fetchHazard = false;
 	Register[] registerFile = new Register[9];
 	Memory mem = new Memory();
@@ -37,7 +40,7 @@ public class Simulator {
 	public static void main(String[] args) throws Exception {
 		Simulator simulator = new Simulator();
 		BufferedReader br = new BufferedReader(new FileReader(
-				"C:\\Users\\Omar\\project\\Microproccessors\\file.txt"));
+				"C:\\Users\\HGezeery\\project\\Microproccessors\\file.txt"));
 		String everything;
 		try {
 			StringBuilder sb = new StringBuilder();
@@ -118,17 +121,18 @@ public class Simulator {
 		int x;
 		for (int i = 0; i < num_add + num_mul + num_load; i++) {
 			if (i < num_add) {
-				simulator.reservationStations[i] = new reservationStation("add");
+				simulator.reservationStations[i] = new reservationStation("add"
+						+ i);
 			} else {
 				if (i < num_mul + num_add) {
 					x = i - num_add;
 					simulator.reservationStations[i] = new reservationStation(
-							"mul");
+							"mul" + (i - num_add));
 				} else {
 					if (i < num_load + num_add + num_mul) {
 						x = i - num_add - num_mul;
 						simulator.reservationStations[i] = new reservationStation(
-								"load");
+								"load" + (i - num_add - num_mul));
 					}
 				}
 			}
@@ -140,7 +144,7 @@ public class Simulator {
 				+ num_load];
 		String functionalUnitName = "";
 		for (int i = 0; i < num_add + num_mul + num_load; i++) {
-			functionalUnitName = simulator.reservationStations[i].name;
+			functionalUnitName = simulator.reservationStations[i].type;
 			simulator.functionalUnits[i] = new FunctionalUnit(
 					functionalUnitName);
 		}
@@ -356,41 +360,153 @@ public class Simulator {
 
 	}
 
-	public static void simulate(Simulator s) {
-		s.PC.setValue(s.currentAddress);
-		while (true) {
-			s.fetchHazard = false;
-			s.instructionBuffer[s.instructionBufferIndex] = decode(s,
-					s.mem.memory[s.PC.getValue()]);
-			s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
-			s.instructionBufferIndex++;
-			s.instructionsInBuffer++;
-			if (s.instructionBuffer[0] == null) {
-				for (int i = 1; i <= s.instructionsInBuffer; i++) {
-					s.instructionBuffer[i - 1] = s.instructionBuffer[i];
-				}
+	public int computeArithmetic(Instruction instruction) {
+		if (instruction.operation.equals("add"))
+			return instruction.Rb.getValue() + instruction.Rc.getValue();
+		if (instruction.operation.equals("sub"))
+			return instruction.Rb.getValue() - instruction.Rc.getValue();
+		if (instruction.operation.equals("mul"))
+			return instruction.Rb.getValue() * instruction.Rc.getValue();
+		if (instruction.operation.equals("nand")) {
+			int value = instruction.Rb.getValue() & instruction.Rc.getValue();
+			return intComplement(value);
+		}
+		return 0;
+
+	}
+
+	public static int intComplement(int decimal) {
+		int base = 2;
+		int result = 0;
+		int multiplier = 1;
+
+		while (decimal > 0) {
+			int residue = decimal % base;
+			decimal = decimal / base;
+			result = result + residue * multiplier;
+			multiplier = multiplier * 10;
+		}
+		String result1 = result + "";
+		String result2 = "";
+		for (int i = 0; i < result1.length(); i++) {
+			if (result1.charAt(i) == '1') {
+				result2 += '0';
 			}
-			if (!s.instructionBuffer[0].operation.equals("sw")) {
-				for (int i = 0; i < s.functionalUnits.length; i++) {
-					if ((!s.functionalUnits[i].busy)
-							&& (s.instructionBuffer[0].Ra
-									.equals(s.functionalUnits[i].register))) {
-						s.fetchHazard = true;
+			if (result1.charAt(i) == '0') {
+				result2 += '1';
+			}
+		}
+		return Integer.parseInt(result2, 2);
+	}
+
+	public static void simulate(Simulator s) {
+		s.PC.setValue(s.startAddress);
+		while (true) {
+			if (s.PC.getValue() != s.startAddress) { // for the first
+														// instruction
+				s.fetchHazard = false;
+				// commit
+				if (s.reOrderBuffers[s.ROB_head].isReady) {
+					if (s.reOrderBuffers[s.ROB_head].destination_memory == -1) {
+						s.reOrderBuffers[s.ROB_head].destination_register
+								.setValue(s.reOrderBuffers[s.ROB_head].value);
+					} else {
+						s.mem.memory[s.reOrderBuffers[s.ROB_head].destination_memory] = s.reOrderBuffers[s.ROB_head].value
+								+ "";
+					}
+					s.ROB_head++;
+					if (s.ROB_head >= s.reOrderBuffers.length)
+						s.ROB_head = 0;
+				}
+
+				// write-back
+				for (int i = 0; i < s.reservationStations.length; i++) {
+					if (s.reservationStations[i].busy) {
+						if (s.reservationStations[i].remaining_cycles == 0) {
+							s.reOrderBuffers[s.reservationStations[i].destination].isReady = true;
+							s.reservationStations[i].busy = false;
+							s.reservationStations[i].operation = "";
+						}
+
 					}
 				}
-				if (!s.fetchHazard) {
-					for (int i = 0; i < s.reservationStations.length; i++) {
-						if ((s.reservationStations[i].name
-								.equals(s.instructionBuffer[0].type))
-								&& (!s.reservationStations[i].busy)) {
-							s.reservationStations[i].busy=true;
-							s.reservationStations[i].operation=s.instructionBuffer[0].operation;
-							s.reservationStations[i].rDestination=s.instructionBuffer[0].Ra;
-							s.functionalUnits[i].busy = false;
+				// execute
+				for (int i = 0; i < s.reservationStations.length; i++) {
+					if (s.reservationStations[i].busy) {
+						s.reservationStations[i].remaining_cycles--;
+					}
+				}
+				// issue
+				// if operation not store i.e destination not memory, register
+				// ra
+				if (s.instructionBuffer[0].type.equals("add")
+						|| s.instructionBuffer[0].type.equals("mul")) {
+					if (s.reOrderBuffers[s.ROB_tail] != null)
+						s.fetchHazard = true;
+
+					if (!s.fetchHazard) {
+						reservationSettingLoop: for (int i = 0; i < s.reservationStations.length; i++) {
+							if ((s.reservationStations[i].type.substring(0,
+									s.reservationStations[i].type.length() - 1)
+									.equals(s.instructionBuffer[0].type))
+									&& (!s.reservationStations[i].busy)) {
+								s.reservationStations[i].busy = true;
+								s.reservationStations[i].operation = s.instructionBuffer[0].operation;
+								s.functionalUnits[i].busy = true;
+								s.functionalUnits[i].register = s.instructionBuffer[0].Ra;
+								if (s.instructionBuffer[0].type.equals("add")) {
+									s.reservationStations[i].remaining_cycles = 2;
+								} else if (s.instructionBuffer[0].type
+										.equals("mul")) {
+									s.reservationStations[i].remaining_cycles = 6;
+								}
+								s.reOrderBuffers[s.ROB_tail] = new ROB(
+										s.instructionBuffer[0].type,
+										s.instructionBuffer[0].Ra, -1, 0);
+								s.reservationStations[i].destination = s.ROB_tail;
+								s.ROB_tail++;
+								if (s.ROB_tail == s.reOrderBuffers.length - 1)
+									s.ROB_tail = 0;
+								// get rj rk qj qk
+								s.reservationStations[i].rj = 1;
+								s.reservationStations[i].rk = 1;
+								for (int j = 0; j < s.functionalUnits.length; j++) {
+									if (s.functionalUnits[j].register
+											.equals(s.instructionBuffer[0].Rb)) {
+										s.reservationStations[i].rj = 0;
+										s.reservationStations[i].qj = s.functionalUnits[j].name;
+									}
+
+									if (s.functionalUnits[j].register
+											.equals(s.instructionBuffer[0].Rc)) {
+										s.reservationStations[i].rk = 0;
+										s.reservationStations[i].qk = s.functionalUnits[j].name;
+									}
+
+								}
+								s.instructionBuffer[0] = null;
+								break reservationSettingLoop;
+							}
+						}
+						// shifting instruction buffer
+						if (s.instructionBuffer[0] == null) {
+							for (int i = 1; i <= s.instructionsInBuffer; i++) {
+								s.instructionBuffer[i - 1] = s.instructionBuffer[i];
+							}
 						}
 					}
 				}
 			}
+			// fetch
+			if (s.instructionBufferIndex < s.instructionBuffer.length) {
+				s.instructionBuffer[s.instructionBufferIndex] = decode(s,
+						s.mem.memory[s.PC.getValue()]);
+				s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
+				s.instructionBufferIndex++;
+				s.instructionsInBuffer++;
+				s.PC.setValue(s.PC.getValue() + 1);
+			}
+			s.cycles++;
 		}
 
 	}
