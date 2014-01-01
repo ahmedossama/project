@@ -9,4 +9,4 @@
 R1,3939
 mem[3939],22
 start
-addi,R4,R5,4
+mul,R4,R4,R4

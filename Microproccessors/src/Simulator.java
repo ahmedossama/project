@@ -59,7 +59,7 @@ public class Simulator {
 
 		// caches initialization
 		int cache_lvls = Integer.parseInt(instructions[0]);
-		simulator.caches = new Cache[cache_lvls];
+		simulator.caches = new Cache[cache_lvls+1];
 		int current_line = 2;
 		String cache_1_geometry = instructions[1];
 		if (cache_lvls == 2) {
@@ -98,6 +98,12 @@ public class Simulator {
 					Integer.parseInt(cache_1_geometry1[3]),
 					cache_1_geometry1[4], cache_1_geometry1[5]);
 			simulator.caches[0] = lvl1;
+			Cache instructionCache = new Cache(Integer.parseInt(cache_1_geometry1[0]),
+					Integer.parseInt(cache_1_geometry1[1]),
+					Integer.parseInt(cache_1_geometry1[2]),
+					Integer.parseInt(cache_1_geometry1[3]),
+					cache_1_geometry1[4], cache_1_geometry1[5]);
+			simulator.caches[simulator.caches.length-1] = instructionCache;
 		}
 		// memory access time
 		simulator.memory_access_time = Integer
@@ -508,14 +514,14 @@ public class Simulator {
 								s.reservationStations[i].qj="";
 								s.reservationStations[i].qk="";
 								for (int j = 0; j < s.functionalUnits.length; j++) {
-									if (s.functionalUnits[j].register
-											.equals(s.instructionBuffer[0].Rb)) {
+									if ((s.functionalUnits[j].register
+											.equals(s.instructionBuffer[0].Rb))&&j!=i) {
 										s.reservationStations[i].rj = 0;
 										s.reservationStations[i].qj = s.functionalUnits[j].name;
 									}
 
-									if (s.functionalUnits[j].register
-											.equals(s.instructionBuffer[0].Rc)) {
+									if ((s.functionalUnits[j].register
+											.equals(s.instructionBuffer[0].Rc))&&j!=i) {
 										s.reservationStations[i].rk = 0;
 										s.reservationStations[i].qk = s.functionalUnits[j].name;
 									}
