@@ -146,7 +146,7 @@ public class Simulator {
 		for (int i = 0; i < num_add + num_mul + num_load; i++) {
 			functionalUnitName = simulator.reservationStations[i].type;
 			simulator.functionalUnits[i] = new FunctionalUnit(
-					functionalUnitName);
+					functionalUnitName, new Register());
 		}
 
 		// registers initialization
@@ -154,6 +154,7 @@ public class Simulator {
 		simulator.R1 = new Register();
 		simulator.R2 = new Register();
 		simulator.R3 = new Register();
+		simulator.R3.setValue(3);
 		simulator.R4 = new Register();
 		simulator.R5 = new Register();
 		simulator.R6 = new Register();
@@ -217,6 +218,8 @@ public class Simulator {
 		}
 
 		simulator.instructionBuffer = new Instruction[simulator.instuctionBufferSize];
+		for (int i = 0; i < simulator.instuctionBufferSize; i++)
+			simulator.instructionBuffer[i] = new Instruction();
 		simulator.currentAddress = simulator.startAddress;
 		simulate(simulator);
 	}
@@ -360,9 +363,11 @@ public class Simulator {
 
 	}
 
-	public int computeArithmetic(Instruction instruction) {
+	public static int computeArithmetic(Instruction instruction) {
 		if (instruction.operation.equals("add"))
 			return instruction.Rb.getValue() + instruction.Rc.getValue();
+		if (instruction.operation.equals("addi"))
+			return instruction.Rb.getValue() + instruction.imm;
 		if (instruction.operation.equals("sub"))
 			return instruction.Rb.getValue() - instruction.Rc.getValue();
 		if (instruction.operation.equals("mul"))
@@ -401,12 +406,21 @@ public class Simulator {
 
 	public static void simulate(Simulator s) {
 		s.PC.setValue(s.startAddress);
-		while (true) {
+
+		while (s.PC.getValue() < (s.startAddress + s.numOfInstructions)
+				|| s.ROB_head != s.ROB_tail || s.cycles==1) {
+			// instructions still exist || or the ROB entry at head is not null
+			// continue
+			System.out.println(s.ROB_head);
+			System.out.println(s.ROB_tail);
+			s.cycles++;
 			if (s.PC.getValue() != s.startAddress) { // for the first
 														// instruction
 				s.fetchHazard = false;
 				// commit
-				if (s.reOrderBuffers[s.ROB_head].isReady) {
+				if (s.reOrderBuffers[s.ROB_head] != null
+						&& s.reOrderBuffers[s.ROB_head].isReady) {
+					// if destination is not memory
 					if (s.reOrderBuffers[s.ROB_head].destination_memory == -1) {
 						s.reOrderBuffers[s.ROB_head].destination_register
 								.setValue(s.reOrderBuffers[s.ROB_head].value);
@@ -414,33 +428,51 @@ public class Simulator {
 						s.mem.memory[s.reOrderBuffers[s.ROB_head].destination_memory] = s.reOrderBuffers[s.ROB_head].value
 								+ "";
 					}
+					s.reOrderBuffers[s.ROB_head] = null;
 					s.ROB_head++;
 					if (s.ROB_head >= s.reOrderBuffers.length)
 						s.ROB_head = 0;
 				}
 
 				// write-back
+				String opr;
 				for (int i = 0; i < s.reservationStations.length; i++) {
 					if (s.reservationStations[i].busy) {
 						if (s.reservationStations[i].remaining_cycles == 0) {
 							s.reOrderBuffers[s.reservationStations[i].destination].isReady = true;
+							s.reOrderBuffers[s.reservationStations[i].destination].value = computeArithmetic(s.reservationStations[i].instruction);
 							s.reservationStations[i].busy = false;
-							s.reservationStations[i].operation = "";
+							opr = s.reservationStations[i].type;
+							for (int j = 0; j < s.reservationStations.length; j++) {
+								if (s.reservationStations[j].busy) {
+									if(s.reservationStations[j].qj.equals(opr))
+									s.reservationStations[j].rj = 1;
+								}
+								if(s.reservationStations[j].busy){
+								if (s.reservationStations[j].qk.equals(opr)) {
+									s.reservationStations[j].rk = 1;
+								}
+								}
+							}
 						}
 
 					}
 				}
 				// execute
 				for (int i = 0; i < s.reservationStations.length; i++) {
-					if (s.reservationStations[i].busy) {
+					if (s.reservationStations[i].busy
+							&& s.reservationStations[i].rj == 1
+							&& s.reservationStations[i].rk == 1) {
 						s.reservationStations[i].remaining_cycles--;
 					}
+
 				}
 				// issue
 				// if operation not store i.e destination not memory, register
-				// ra
-				if (s.instructionBuffer[0].type.equals("add")
-						|| s.instructionBuffer[0].type.equals("mul")) {
+				// r
+				if (s.instructionBuffer[0] != null
+						&& (s.instructionBuffer[0].type.equals("add") || s.instructionBuffer[0].type
+								.equals("mul"))) {
 					if (s.reOrderBuffers[s.ROB_tail] != null)
 						s.fetchHazard = true;
 
@@ -460,16 +492,21 @@ public class Simulator {
 										.equals("mul")) {
 									s.reservationStations[i].remaining_cycles = 6;
 								}
+
 								s.reOrderBuffers[s.ROB_tail] = new ROB(
 										s.instructionBuffer[0].type,
 										s.instructionBuffer[0].Ra, -1, 0);
+								System.out
+										.println(s.reOrderBuffers[s.ROB_head]);
 								s.reservationStations[i].destination = s.ROB_tail;
 								s.ROB_tail++;
-								if (s.ROB_tail == s.reOrderBuffers.length - 1)
+								if (s.ROB_tail == s.reOrderBuffers.length)
 									s.ROB_tail = 0;
 								// get rj rk qj qk
 								s.reservationStations[i].rj = 1;
 								s.reservationStations[i].rk = 1;
+								s.reservationStations[i].qj="";
+								s.reservationStations[i].qk="";
 								for (int j = 0; j < s.functionalUnits.length; j++) {
 									if (s.functionalUnits[j].register
 											.equals(s.instructionBuffer[0].Rb)) {
@@ -484,7 +521,11 @@ public class Simulator {
 									}
 
 								}
+								// send instruction to reservation station
+								s.reservationStations[i].instruction = s.instructionBuffer[0];
 								s.instructionBuffer[0] = null;
+								s.instructionBufferIndex--;
+								s.instructionsInBuffer--;
 								break reservationSettingLoop;
 							}
 						}
@@ -499,15 +540,20 @@ public class Simulator {
 			}
 			// fetch
 			if (s.instructionBufferIndex < s.instructionBuffer.length) {
-				s.instructionBuffer[s.instructionBufferIndex] = decode(s,
-						s.mem.memory[s.PC.getValue()]);
-				s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
-				s.instructionBufferIndex++;
-				s.instructionsInBuffer++;
-				s.PC.setValue(s.PC.getValue() + 1);
+				if (s.PC.getValue() < s.startAddress + s.numOfInstructions) {
+					s.instructionBuffer[s.instructionBufferIndex] = decode(s,
+							s.mem.memory[s.PC.getValue()]);
+					System.out.println(s.instructionBuffer[0].type);
+					s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
+					s.instructionBufferIndex++;
+					s.instructionsInBuffer++;
+					s.PC.setValue(s.PC.getValue() + 1);
+				}
 			}
-			s.cycles++;
+
 		}
+		System.out.println("no. of cycles = " + s.cycles + "");
+		System.out.println("R4 value = " + s.R4.getValue());
 
 	}
 }

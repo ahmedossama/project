@@ -9,6 +9,7 @@ public class reservationStation {
 	int offset;
 	int destination;
 	int remaining_cycles;
+	Instruction instruction;
 	public reservationStation(String type) {
 		this.type = type;
 	}

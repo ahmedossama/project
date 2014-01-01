@@ -5,7 +5,8 @@ public class FunctionalUnit {
 	Register register;
 	boolean busy;
 	
-	public FunctionalUnit(String name){
+	public FunctionalUnit(String name, Register register){
 		this.name=name;
+		this.register = register;
 	}
 }
