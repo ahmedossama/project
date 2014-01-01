@@ -4,9 +4,12 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 public class Simulator {
 	int cycles = 0;
+	boolean isFound = false;
+	int fetchCycles = 0;
 	int memory_access_time;
 	Cache[] caches;
 	int instuctionBufferSize;
@@ -28,6 +31,7 @@ public class Simulator {
 	int instructionBufferIndex = 0;
 	int ROB_head;
 	int ROB_tail;
+	boolean isFetching = false;
 	boolean fetchHazard = false;
 	Register[] registerFile = new Register[9];
 	Memory mem = new Memory();
@@ -40,7 +44,7 @@ public class Simulator {
 	public static void main(String[] args) throws Exception {
 		Simulator simulator = new Simulator();
 		BufferedReader br = new BufferedReader(new FileReader(
-				"C:\\Users\\HGezeery\\project\\Microproccessors\\file.txt"));
+				"C:\\Users\\Omar\\project\\Microproccessors\\file.txt"));
 		String everything;
 		try {
 			StringBuilder sb = new StringBuilder();
@@ -59,7 +63,7 @@ public class Simulator {
 
 		// caches initialization
 		int cache_lvls = Integer.parseInt(instructions[0]);
-		simulator.caches = new Cache[cache_lvls+1];
+		simulator.caches = new Cache[cache_lvls + 1];
 		int current_line = 2;
 		String cache_1_geometry = instructions[1];
 		if (cache_lvls == 2) {
@@ -78,7 +82,7 @@ public class Simulator {
 					Integer.parseInt(cache_3_geometry1[2]),
 					Integer.parseInt(cache_3_geometry1[3]),
 					cache_3_geometry1[4], cache_3_geometry1[5]);
-			simulator.caches[2] = lvl3;
+			simulator.caches[4] = lvl3;
 		case 2:
 
 			String[] cache_2_geometry1 = instructions[2].split(",");
@@ -88,7 +92,7 @@ public class Simulator {
 					Integer.parseInt(cache_2_geometry1[2]),
 					Integer.parseInt(cache_2_geometry1[3]),
 					cache_2_geometry1[4], cache_2_geometry1[5]);
-			simulator.caches[1] = lvl2;
+			simulator.caches[3] = lvl2;
 		case 1:
 			String[] cache_1_geometry1 = cache_1_geometry.split(",");
 
@@ -98,12 +102,13 @@ public class Simulator {
 					Integer.parseInt(cache_1_geometry1[3]),
 					cache_1_geometry1[4], cache_1_geometry1[5]);
 			simulator.caches[0] = lvl1;
-			Cache instructionCache = new Cache(Integer.parseInt(cache_1_geometry1[0]),
+			Cache instructionCache = new Cache(
+					Integer.parseInt(cache_1_geometry1[0]),
 					Integer.parseInt(cache_1_geometry1[1]),
 					Integer.parseInt(cache_1_geometry1[2]),
 					Integer.parseInt(cache_1_geometry1[3]),
 					cache_1_geometry1[4], cache_1_geometry1[5]);
-			simulator.caches[simulator.caches.length-1] = instructionCache;
+			simulator.caches[1] = instructionCache;
 		}
 		// memory access time
 		simulator.memory_access_time = Integer
@@ -211,6 +216,7 @@ public class Simulator {
 					instructions[current_line]));
 			current_line++;
 			simulator.currentAddress++;
+			simulator.currentAddress++;
 			simulator.numOfInstructions++;
 		}
 		simulator.currentAddress = simulator.startAddress;
@@ -228,6 +234,13 @@ public class Simulator {
 			simulator.instructionBuffer[i] = new Instruction();
 		simulator.currentAddress = simulator.startAddress;
 		simulate(simulator);
+	}
+
+	public static int randNum(int min, int max) {
+
+		Random rand = new Random();
+		int randomNum = rand.nextInt((max - min) + 1) + min;
+		return randomNum;
 	}
 
 	public static Instruction decode(Simulator s, String instruction) {
@@ -414,11 +427,9 @@ public class Simulator {
 		s.PC.setValue(s.startAddress);
 
 		while (s.PC.getValue() < (s.startAddress + s.numOfInstructions)
-				|| s.ROB_head != s.ROB_tail || s.cycles==1) {
+				|| s.ROB_head != s.ROB_tail || s.cycles == 1) {
 			// instructions still exist || or the ROB entry at head is not null
 			// continue
-			System.out.println(s.ROB_head);
-			System.out.println(s.ROB_tail);
 			s.cycles++;
 			if (s.PC.getValue() != s.startAddress) { // for the first
 														// instruction
@@ -451,13 +462,13 @@ public class Simulator {
 							opr = s.reservationStations[i].type;
 							for (int j = 0; j < s.reservationStations.length; j++) {
 								if (s.reservationStations[j].busy) {
-									if(s.reservationStations[j].qj.equals(opr))
-									s.reservationStations[j].rj = 1;
+									if (s.reservationStations[j].qj.equals(opr))
+										s.reservationStations[j].rj = 1;
 								}
-								if(s.reservationStations[j].busy){
-								if (s.reservationStations[j].qk.equals(opr)) {
-									s.reservationStations[j].rk = 1;
-								}
+								if (s.reservationStations[j].busy) {
+									if (s.reservationStations[j].qk.equals(opr)) {
+										s.reservationStations[j].rk = 1;
+									}
 								}
 							}
 						}
@@ -511,17 +522,19 @@ public class Simulator {
 								// get rj rk qj qk
 								s.reservationStations[i].rj = 1;
 								s.reservationStations[i].rk = 1;
-								s.reservationStations[i].qj="";
-								s.reservationStations[i].qk="";
+								s.reservationStations[i].qj = "";
+								s.reservationStations[i].qk = "";
 								for (int j = 0; j < s.functionalUnits.length; j++) {
 									if ((s.functionalUnits[j].register
-											.equals(s.instructionBuffer[0].Rb))&&j!=i) {
+											.equals(s.instructionBuffer[0].Rb))
+											&& j != i) {
 										s.reservationStations[i].rj = 0;
 										s.reservationStations[i].qj = s.functionalUnits[j].name;
 									}
 
 									if ((s.functionalUnits[j].register
-											.equals(s.instructionBuffer[0].Rc))&&j!=i) {
+											.equals(s.instructionBuffer[0].Rc))
+											&& j != i) {
 										s.reservationStations[i].rk = 0;
 										s.reservationStations[i].qk = s.functionalUnits[j].name;
 									}
@@ -547,19 +560,63 @@ public class Simulator {
 			// fetch
 			if (s.instructionBufferIndex < s.instructionBuffer.length) {
 				if (s.PC.getValue() < s.startAddress + s.numOfInstructions) {
-					s.instructionBuffer[s.instructionBufferIndex] = decode(s,
-							s.mem.memory[s.PC.getValue()]);
-					System.out.println(s.instructionBuffer[0].type);
-					s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
-					s.instructionBufferIndex++;
-					s.instructionsInBuffer++;
-					s.PC.setValue(s.PC.getValue() + 1);
+					if (!s.isFetching) {
+						s.isFound = false;
+						s.fetchCycles = 0;
+						cacheLoop: for (int i = 1; i <= s.cachelvls; i++) {
+							for (int j = 0; j < s.caches[i].data.length; i++) {
+								if (s.caches[i].data[j] == (s.PC.getValue() / s.caches[i].lineSize)
+										* s.caches[i].lineSize) {
+									s.fetchCycles += s.caches[i].getNumCycles();
+									s.isFound = true;
+									break cacheLoop;
+								}
+							}
+
+							s.fetchCycles += s.caches[i].getNumCycles();
+						}
+						if (!s.isFound) {
+							s.fetchCycles += s.memory_access_time;
+						}
+						s.isFetching = true;
+					} else {
+						s.fetchCycles--;
+						if (s.fetchCycles == 0) {
+							s.instructionBuffer[s.instructionBufferIndex] = decode(
+									s, s.mem.memory[s.PC.getValue()]);
+							System.out.println(s.instructionBuffer[0].type);
+							s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
+							s.instructionBufferIndex++;
+							s.instructionsInBuffer++;
+							s.PC.setValue(s.PC.getValue() + 2);
+						}
+					}
+
 				}
 			}
 
 		}
+
 		System.out.println("no. of cycles = " + s.cycles + "");
 		System.out.println("R4 value = " + s.R4.getValue());
 
+	}
+
+	public void addInstructionToCache(int address, Cache c) {
+		boolean found = false;
+		if (c.type.equals("fully associative")) {
+			free: for (int i = 0; i < c.data.length; i++) {
+				if (c.data[i] != -1) {
+					c.data[i] = address;
+					found = true;
+					break free;
+				}
+
+			}
+			if (!found) {
+				int x = randNum(0, c.data.length - 1);
+				c.data[x] = address;
+			}
+		}
 	}
 }

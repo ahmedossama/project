@@ -1,13 +1,14 @@
 public class Cache {
-	private int size; //
-	private int lineSize;
-	private int associativity;
-	private String writePolicyHit;
-	private String writePolicyMiss;
-	private int lines;
-	private String type;
-	private int numCycles;
-	private CacheEntry[] cacheEntries;
+	int size;
+	int lineSize;
+	int associativity;
+	String writePolicyHit;
+	String writePolicyMiss;
+	int lines;
+	String type;
+	int numCycles;
+	int[]data;
+	boolean[]dirty;
 
 	public Cache(int s, int l, int m, int numCycles, String writePolicyHit,
 			String writePolicyMiss) {
@@ -18,14 +19,18 @@ public class Cache {
 		this.setWritePolicyMiss(writePolicyMiss);
 		setLines(getSize() / getLineSize());
 		this.setNumCycles(numCycles);
+		this.data=new int [getLines()];
+		this.dirty=new boolean [getLines()];
+		for(int i=0;i<data.length;i++){
+			data[i]=-1;
+		}
 		if (getAssociativity() == getLines()) {
 			setType("fully associative");
 		} else if (getAssociativity() == 1) {
 			setType("direct mapped");
 		} else {
-			setType("set associative");
+			setType(m+"-set associative");
 		}
-		this.setCacheEntries(new CacheEntry[getLines()]);
 
 	}
 
@@ -93,11 +98,5 @@ public class Cache {
 		this.numCycles = numCycles;
 	}
 
-	public void setCacheEntries(CacheEntry[] cacheEntries) {
-		this.cacheEntries = cacheEntries;
-	}
 
-	public CacheEntry[] getCacheEntries() {
-		return cacheEntries;
-	}
 }

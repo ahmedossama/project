@@ -3,10 +3,10 @@
 5,3,1,4,writethrough,writeback
 12
 15
-2,1,5
+1,1,5
 87
 32
 R1,3939
 mem[3939],22
 start
-mul,R4,R4,R4
+add,R4,R4,R4
