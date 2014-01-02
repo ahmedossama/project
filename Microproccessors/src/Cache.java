@@ -9,7 +9,9 @@ public class Cache {
 	int numCycles;
 	int[]data;
 	boolean[]dirty;
-
+	boolean[]isInstruction;
+	int hits;
+	int accessed;
 	public Cache(int s, int l, int m, int numCycles, String writePolicyHit,
 			String writePolicyMiss) {
 		setSize(s);
@@ -21,6 +23,7 @@ public class Cache {
 		this.setNumCycles(numCycles);
 		this.data=new int [getLines()];
 		this.dirty=new boolean [getLines()];
+		this.isInstruction=new boolean[getLines()];
 		for(int i=0;i<data.length;i++){
 			data[i]=-1;
 		}

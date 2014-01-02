@@ -8,6 +8,7 @@ import java.util.Random;
 
 public class Simulator {
 	int cycles = 0;
+	int x = 100;
 	boolean isFound = false;
 	int fetchCycles = 0;
 	int memory_access_time;
@@ -44,7 +45,7 @@ public class Simulator {
 	public static void main(String[] args) throws Exception {
 		Simulator simulator = new Simulator();
 		BufferedReader br = new BufferedReader(new FileReader(
-				"C:\\Users\\Omar\\project\\Microproccessors\\file.txt"));
+				"C:\\Users\\HGezeery\\project\\Microproccessors\\file.txt"));
 		String everything;
 		try {
 			StringBuilder sb = new StringBuilder();
@@ -82,7 +83,7 @@ public class Simulator {
 					Integer.parseInt(cache_3_geometry1[2]),
 					Integer.parseInt(cache_3_geometry1[3]),
 					cache_3_geometry1[4], cache_3_geometry1[5]);
-			simulator.caches[4] = lvl3;
+			simulator.caches[3] = lvl3;
 		case 2:
 
 			String[] cache_2_geometry1 = instructions[2].split(",");
@@ -92,7 +93,7 @@ public class Simulator {
 					Integer.parseInt(cache_2_geometry1[2]),
 					Integer.parseInt(cache_2_geometry1[3]),
 					cache_2_geometry1[4], cache_2_geometry1[5]);
-			simulator.caches[3] = lvl2;
+			simulator.caches[2] = lvl2;
 		case 1:
 			String[] cache_1_geometry1 = cache_1_geometry.split(",");
 
@@ -164,6 +165,8 @@ public class Simulator {
 		simulator.R0 = new Register();
 		simulator.R1 = new Register();
 		simulator.R2 = new Register();
+		simulator.R1.setValue(1);
+		simulator.R2.setValue(2);
 		simulator.R3 = new Register();
 		simulator.R3.setValue(3);
 		simulator.R4 = new Register();
@@ -197,7 +200,7 @@ public class Simulator {
 				String[] data_split = data.split(",");
 				int index = Character.getNumericValue(data_split[0].charAt(1));
 				int value = Integer.parseInt(data_split[1]); // data int or
-																// string??
+				// string??
 				simulator.registerFile[index].setValue(value);
 			} else {
 				String[] data_split = data.split(",");
@@ -220,19 +223,11 @@ public class Simulator {
 			simulator.numOfInstructions++;
 		}
 		simulator.currentAddress = simulator.startAddress;
-		simulator.cacheInstruction = new String[simulator.numOfInstructions];// correct
-																				// size
-																				// ??
-
-		for (int i = 0; i < simulator.numOfInstructions; i++) {
-			simulator.cacheInstruction[i] = simulator.mem.memory[simulator.currentAddress];
-			simulator.currentAddress++;
-		}
 
 		simulator.instructionBuffer = new Instruction[simulator.instuctionBufferSize];
 		for (int i = 0; i < simulator.instuctionBufferSize; i++)
 			simulator.instructionBuffer[i] = new Instruction();
-		simulator.currentAddress = simulator.startAddress;
+
 		simulate(simulator);
 	}
 
@@ -385,54 +380,41 @@ public class Simulator {
 	public static int computeArithmetic(Instruction instruction) {
 		if (instruction.operation.equals("add"))
 			return instruction.Rb.getValue() + instruction.Rc.getValue();
-		if (instruction.operation.equals("addi"))
+		if (instruction.operation.equals("addi")) {
+			System.out.println(instruction.Rb.getValue() + instruction.imm
+					+ "ss");
 			return instruction.Rb.getValue() + instruction.imm;
+		}
 		if (instruction.operation.equals("sub"))
 			return instruction.Rb.getValue() - instruction.Rc.getValue();
 		if (instruction.operation.equals("mul"))
 			return instruction.Rb.getValue() * instruction.Rc.getValue();
 		if (instruction.operation.equals("nand")) {
-			int value = instruction.Rb.getValue() & instruction.Rc.getValue();
-			return intComplement(value);
+			// return nand(instruction.Rb.getValue(),
+			// instruction.Rc.getValue());
+		}
+		if (instruction.operation.equals("lw")) {
+			return instruction.imm + instruction.Rb.getValue();
 		}
 		return 0;
 
 	}
 
-	public static int intComplement(int decimal) {
-		int base = 2;
-		int result = 0;
-		int multiplier = 1;
-
-		while (decimal > 0) {
-			int residue = decimal % base;
-			decimal = decimal / base;
-			result = result + residue * multiplier;
-			multiplier = multiplier * 10;
-		}
-		String result1 = result + "";
-		String result2 = "";
-		for (int i = 0; i < result1.length(); i++) {
-			if (result1.charAt(i) == '1') {
-				result2 += '0';
-			}
-			if (result1.charAt(i) == '0') {
-				result2 += '1';
-			}
-		}
-		return Integer.parseInt(result2, 2);
-	}
-
 	public static void simulate(Simulator s) {
 		s.PC.setValue(s.startAddress);
-
-		while (s.PC.getValue() < (s.startAddress + s.numOfInstructions)
-				|| s.ROB_head != s.ROB_tail || s.cycles == 1) {
+		int value = s.memory_access_time;
+		for (int i = 1; i < s.caches.length; i++)
+			value += s.caches[i].numCycles;
+		System.out.println(s.numOfInstructions);
+		boolean fetched = false;
+		while (s.PC.getValue() < (s.startAddress + 2 * s.numOfInstructions)
+				|| s.ROB_head != s.ROB_tail || s.cycles == s.x) {
 			// instructions still exist || or the ROB entry at head is not null
 			// continue
 			s.cycles++;
+			fetched = false;
 			if (s.PC.getValue() != s.startAddress) { // for the first
-														// instruction
+				// instruction
 				s.fetchHazard = false;
 				// commit
 				if (s.reOrderBuffers[s.ROB_head] != null
@@ -455,22 +437,69 @@ public class Simulator {
 				String opr;
 				for (int i = 0; i < s.reservationStations.length; i++) {
 					if (s.reservationStations[i].busy) {
+
 						if (s.reservationStations[i].remaining_cycles == 0) {
-							s.reOrderBuffers[s.reservationStations[i].destination].isReady = true;
-							s.reOrderBuffers[s.reservationStations[i].destination].value = computeArithmetic(s.reservationStations[i].instruction);
-							s.reservationStations[i].busy = false;
-							opr = s.reservationStations[i].type;
 							for (int j = 0; j < s.reservationStations.length; j++) {
 								if (s.reservationStations[j].busy) {
-									if (s.reservationStations[j].qj.equals(opr))
+									if (s.reservationStations[j].rj == 0
+											&& s.reservationStations[i].type
+													.equals(s.reservationStations[j].qj))
 										s.reservationStations[j].rj = 1;
-								}
-								if (s.reservationStations[j].busy) {
-									if (s.reservationStations[j].qk.equals(opr)) {
+									if (s.reservationStations[j].rk == 0
+											&& s.reservationStations[i].type
+													.equals(s.reservationStations[j].qk))
 										s.reservationStations[j].rk = 1;
-									}
+
 								}
+
 							}
+							s.functionalUnits[i].busy = false;
+							s.functionalUnits[i].register = new Register();
+							s.reservationStations[i].busy = false;
+							s.reOrderBuffers[s.reservationStations[i].destination].isReady = true;
+							if (s.reservationStations[i].operation.equals("lw")) {
+								s.reOrderBuffers[s.reservationStations[i].destination].value = Integer
+										.parseInt(s.mem.memory[computeArithmetic(s.reservationStations[i].instruction)]);
+							} else if (s.reservationStations[i].operation
+									.equals("sw")) {
+								s.reOrderBuffers[s.reservationStations[i].destination].value = s.reservationStations[i].instruction.Ra
+										.getValue();
+								int swdestination = s.reservationStations[i].instruction.Rb
+										.getValue()
+										+ s.reservationStations[i].instruction.imm;
+								writebackloop: for (int j = 0; j < s.caches.length; j++) {
+									for (int k = 0; k < s.caches[j].data.length; k++) {
+										if (j != 1) {
+											if (s.caches[j].data[k] == (swdestination / s.caches[j].lineSize)
+													* s.caches[j].lineSize) {
+												if (s.caches[j].writePolicyHit
+														.equals("writethrough")) {
+													s.mem.memory[swdestination] = ""
+															+ s.reservationStations[i].instruction.Ra
+																	.getValue();
+												} else {
+													// wait till tommorow
+												}
+												break writebackloop;
+											}
+										}
+									}
+									s.mem.memory[swdestination] = ""
+											+ s.reservationStations[i].instruction.Ra
+													.getValue();
+									if (s.caches[j].writePolicyMiss
+											.equals("writeallocate")) {
+										s.addInstructionToCache(swdestination,
+												s.caches[j], false);
+									}
+
+								}
+							} else {
+								s.reOrderBuffers[s.reservationStations[i].destination].value = computeArithmetic(s.reservationStations[i].instruction);
+							}
+
+							s.reservationStations[i].busy = false;
+							opr = s.reservationStations[i].type;
 						}
 
 					}
@@ -487,9 +516,7 @@ public class Simulator {
 				// issue
 				// if operation not store i.e destination not memory, register
 				// r
-				if (s.instructionBuffer[0] != null
-						&& (s.instructionBuffer[0].type.equals("add") || s.instructionBuffer[0].type
-								.equals("mul"))) {
+				if (s.instructionBuffer[0] != null) {
 					if (s.reOrderBuffers[s.ROB_tail] != null)
 						s.fetchHazard = true;
 
@@ -502,19 +529,66 @@ public class Simulator {
 								s.reservationStations[i].busy = true;
 								s.reservationStations[i].operation = s.instructionBuffer[0].operation;
 								s.functionalUnits[i].busy = true;
-								s.functionalUnits[i].register = s.instructionBuffer[0].Ra;
+								if (!s.instructionBuffer[0].operation
+										.equals("sw"))
+									s.functionalUnits[i].register = s.instructionBuffer[0].Ra;
+								else
+									s.functionalUnits[i].memoryIndex = s.instructionBuffer[0].Rb
+											.getValue()
+											+ s.instructionBuffer[0].imm;
 								if (s.instructionBuffer[0].type.equals("add")) {
 									s.reservationStations[i].remaining_cycles = 2;
 								} else if (s.instructionBuffer[0].type
 										.equals("mul")) {
 									s.reservationStations[i].remaining_cycles = 6;
-								}
+								} else if (s.instructionBuffer[0].type
+										.equals("load")) {
+									boolean issuefound = false;
+									int destinationAddress = s.instructionBuffer[0].Rb
+											.getValue()
+											+ s.instructionBuffer[0].imm;
+									issueloop: for (int j = 0; j < s.caches.length; j++) {
+										s.caches[j].accessed++;
+										for (int k = 0; k < s.caches[j].data.length; k++) {
+											if (j != 1) {
+												if (s.caches[j].data[k] == (destinationAddress / s.caches[j].lineSize)
+														* s.caches[j].lineSize) {
+													s.reservationStations[i].remaining_cycles += s.caches[j].numCycles;
+													issuefound = true;
+													s.caches[j].hits++;
+													break issueloop;
+												}
+											}
 
-								s.reOrderBuffers[s.ROB_tail] = new ROB(
-										s.instructionBuffer[0].type,
-										s.instructionBuffer[0].Ra, -1, 0);
-								System.out
-										.println(s.reOrderBuffers[s.ROB_head]);
+										}
+										if (s.instructionBuffer[0].operation
+												.equals("lw"))
+											s.addInstructionToCache(
+													s.instructionBuffer[0].Rb
+															.getValue()
+															+ s.instructionBuffer[0].imm,
+													s.caches[j], false);
+										if (issuefound == false && j != 1) {
+											s.reservationStations[i].remaining_cycles += s.caches[j].numCycles;
+										}
+									}
+									if (issuefound == false)
+										s.reservationStations[i].remaining_cycles += s.memory_access_time;
+								}
+								if (!s.instructionBuffer[0].equals("sw")) {
+									s.reOrderBuffers[s.ROB_tail] = new ROB(
+											s.instructionBuffer[0].type,
+											s.instructionBuffer[0].Ra, -1, 0);
+								} else {
+									s.reservationStations[i].destination = s.instructionBuffer[0].Rb
+											.getValue()
+											+ s.instructionBuffer[0].imm;
+									s.reOrderBuffers[s.ROB_tail] = new ROB(
+											s.instructionBuffer[0].type,
+											s.instructionBuffer[0].Ra,
+											s.reservationStations[i].destination,
+											0);
+								}
 								s.reservationStations[i].destination = s.ROB_tail;
 								s.ROB_tail++;
 								if (s.ROB_tail == s.reOrderBuffers.length)
@@ -534,17 +608,27 @@ public class Simulator {
 
 									if ((s.functionalUnits[j].register
 											.equals(s.instructionBuffer[0].Rc))
-											&& j != i) {
+											&& j != i
+											&& !s.instructionBuffer[0].type
+													.equals("load")) {
 										s.reservationStations[i].rk = 0;
 										s.reservationStations[i].qk = s.functionalUnits[j].name;
 									}
-
+									if ((s.functionalUnits[j].register
+											.equals(s.instructionBuffer[0].Ra))
+											&& j != i
+											&& s.instructionBuffer[0].operation
+													.equals("sw")) {
+										s.reservationStations[i].rk = 0;
+										s.reservationStations[i].qk = s.functionalUnits[j].name;
+									}
 								}
 								// send instruction to reservation station
 								s.reservationStations[i].instruction = s.instructionBuffer[0];
 								s.instructionBuffer[0] = null;
 								s.instructionBufferIndex--;
 								s.instructionsInBuffer--;
+
 								break reservationSettingLoop;
 							}
 						}
@@ -555,24 +639,29 @@ public class Simulator {
 							}
 						}
 					}
+
 				}
+
 			}
 			// fetch
 			if (s.instructionBufferIndex < s.instructionBuffer.length) {
-				if (s.PC.getValue() < s.startAddress + s.numOfInstructions) {
+				if (s.PC.getValue() < s.startAddress + 2 * s.numOfInstructions) {
 					if (!s.isFetching) {
 						s.isFound = false;
 						s.fetchCycles = 0;
-						cacheLoop: for (int i = 1; i <= s.cachelvls; i++) {
-							for (int j = 0; j < s.caches[i].data.length; i++) {
+						cacheLoop: for (int i = 1; i < s.caches.length; i++) {
+							s.caches[i].accessed++;
+							for (int j = 0; j < s.caches[i].data.length; j++) {
 								if (s.caches[i].data[j] == (s.PC.getValue() / s.caches[i].lineSize)
 										* s.caches[i].lineSize) {
 									s.fetchCycles += s.caches[i].getNumCycles();
+									s.caches[i].hits++;
 									s.isFound = true;
 									break cacheLoop;
 								}
 							}
-
+							s.addInstructionToCache(s.PC.getValue(),
+									s.caches[i], true);
 							s.fetchCycles += s.caches[i].getNumCycles();
 						}
 						if (!s.isFound) {
@@ -582,13 +671,15 @@ public class Simulator {
 					} else {
 						s.fetchCycles--;
 						if (s.fetchCycles == 0) {
+							s.x = s.cycles;
+							System.out.println(s.cycles);
 							s.instructionBuffer[s.instructionBufferIndex] = decode(
 									s, s.mem.memory[s.PC.getValue()]);
-							System.out.println(s.instructionBuffer[0].type);
 							s.instructionBuffer[s.instructionBufferIndex].status = "fetched";
 							s.instructionBufferIndex++;
 							s.instructionsInBuffer++;
 							s.PC.setValue(s.PC.getValue() + 2);
+							s.isFetching = false;
 						}
 					}
 
@@ -598,16 +689,27 @@ public class Simulator {
 		}
 
 		System.out.println("no. of cycles = " + s.cycles + "");
+		System.out.println("R0 value = " + s.R0.getValue());
+		System.out.println("R1 value = " + s.R1.getValue());
+		System.out.println("R2 value = " + s.R2.getValue());
+		System.out.println("R3 value = " + s.R3.getValue());
 		System.out.println("R4 value = " + s.R4.getValue());
+		System.out.println("R5 value = " + s.R5.getValue());
+		System.out.println(s.mem.memory[3]);
+		System.out.println(s.memory_access_time);
 
 	}
 
-	public void addInstructionToCache(int address, Cache c) {
+	public void addInstructionToCache(int address, Cache c, boolean isInst) {
 		boolean found = false;
+		int direct_mapped_index;
+		int m_set_associative = (address / c.lineSize)
+				% (c.lines / c.associativity);
 		if (c.type.equals("fully associative")) {
 			free: for (int i = 0; i < c.data.length; i++) {
-				if (c.data[i] != -1) {
-					c.data[i] = address;
+				if (c.data[i] == -1) {
+					c.data[i] = (address / c.getLineSize()) * c.getLineSize();
+					c.isInstruction[i] = true;
 					found = true;
 					break free;
 				}
@@ -615,8 +717,29 @@ public class Simulator {
 			}
 			if (!found) {
 				int x = randNum(0, c.data.length - 1);
-				c.data[x] = address;
+				c.data[x] = (address / c.getLineSize()) * c.getLineSize();
+				c.isInstruction[x] = isInst;
+			}
+
+		} else if (c.type.equals("direct mapped")) {
+			direct_mapped_index = (address / c.lineSize) % c.lines;
+			c.data[direct_mapped_index] = (address / c.lineSize) * c.lineSize;
+		}
+		// else m-set associative
+		else {
+			for (int i = 0; i < c.associativity; i++) {
+				if (c.data[(i * (c.lines / c.associativity))
+						+ m_set_associative] == -1) {
+					found = true;
+					c.data[i] = (address / c.lineSize) * c.lineSize;
+				}
+			}
+			if (!found) {
+				int x = randNum(0, c.associativity);
+				c.data[(x * (c.lines / c.associativity)) + m_set_associative] = (address * c.lineSize)
+						/ c.lineSize;
 			}
 		}
+
 	}
 }
