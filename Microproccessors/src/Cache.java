@@ -10,8 +10,8 @@ public class Cache {
 	int[]data;
 	boolean[]dirty;
 	boolean[]isInstruction;
-	int hits;
-	int accessed;
+	double hits;
+	double accessed;
 	public Cache(int s, int l, int m, int numCycles, String writePolicyHit,
 			String writePolicyMiss) {
 		setSize(s);

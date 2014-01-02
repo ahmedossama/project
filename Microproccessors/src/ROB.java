@@ -4,6 +4,7 @@ public class ROB {
 	int destination_memory;
 	int value;
 	boolean isReady;
+	Instruction instruction;
 	
 
 	public ROB(String type, Register destination_register, int destination_memory, int value) {

@@ -8,6 +8,7 @@ public class Instruction {
 	boolean immediate = false;
 	int imm;
 	String status;
+	int PC_branch;
 	
 
 }
